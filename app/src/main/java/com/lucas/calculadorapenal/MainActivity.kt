@@ -17,6 +17,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lucas.calculadorapenal.ui.theme.*
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,7 +48,7 @@ fun TelaCalculadoraPenal() {
     var horasEstudo by remember { mutableStateOf("") }
 
     var resultadoVisivel by remember { mutableStateOf(false) }
-
+    var carregando by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -53,7 +57,18 @@ fun TelaCalculadoraPenal() {
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Image(
+            painter = painterResource(id = R.drawable.logo_branca),
+            contentDescription = "Logo Cespedes Lourenço",
+            modifier = Modifier
+                .width(220.dp)
+                .height(90.dp),
+            contentScale = ContentScale.Fit
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         AssistChip(
             onClick = {},
@@ -132,22 +147,47 @@ fun TelaCalculadoraPenal() {
 
         Button(
             onClick = {
+
+                carregando = true
+
                 resultadoVisivel = true
+
+                carregando = false
             },
+
             colors = ButtonDefaults.buttonColors(
                 containerColor = Gold,
                 contentColor = TextWhite
             ),
-            shape = RoundedCornerShape(14.dp),
+
+            shape = RoundedCornerShape(18.dp),
+
+            elevation = ButtonDefaults.buttonElevation(
+                defaultElevation = 8.dp
+            ),
+
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(58.dp)
+
         ) {
-            Text(
-                text = "Calcular Progressões",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
+
+            if (carregando) {
+
+                CircularProgressIndicator(
+                    color = TextWhite,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(22.dp)
+                )
+
+            } else {
+
+                Text(
+                    text = "Calcular Progressões",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         if (resultadoVisivel) {
@@ -223,7 +263,26 @@ fun CardDadosJuridicos(
 
         CampoTextoPenal(
             valor = dataInicio,
-            aoAlterar = onDataInicioChange,
+            aoAlterar = {
+
+                val numeros = it
+                    .filter { char -> char.isDigit() }
+                    .take(8)
+
+                val dataFormatada = buildString {
+
+                    for (i in numeros.indices) {
+
+                        append(numeros[i])
+
+                        if ((i == 1 || i == 3) && i != numeros.lastIndex) {
+                            append("/")
+                        }
+                    }
+                }
+
+                onDataInicioChange(dataFormatada)
+            },
             label = "Data de início da pena"
         )
 
@@ -367,49 +426,94 @@ fun ItemResultado(
         colors = CardDefaults.cardColors(
             containerColor = DarkBlue
         ),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
+
         Column(
-            modifier = Modifier.padding(14.dp)
+            modifier = Modifier.padding(16.dp)
         ) {
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = titulo,
-                    color = TextWhite,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
+
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(
+                            color = Gold.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "⏳",
+                        fontSize = 18.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(
                     modifier = Modifier.weight(1f)
-                )
+                ) {
+
+                    Text(
+                        text = titulo,
+                        color = TextWhite,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = descricao,
+                        color = TextGray,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                }
 
                 Text(
                     text = porcentagem,
                     color = TextWhite,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .background(Gold, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .background(
+                            Gold,
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(
+                            horizontal = 10.dp,
+                            vertical = 5.dp
+                        )
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = descricao,
-                color = TextGray,
-                fontSize = 12.sp
+            HorizontalDivider(
+                color = BorderBlue.copy(alpha = 0.5f)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = "Data estimada",
+                color = TextGray,
+                fontSize = 11.sp
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = data,
                 color = Gold,
-                fontSize = 15.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -482,9 +586,11 @@ fun CampoTextoPenal(
     label: String,
     modifier: Modifier = Modifier
 ) {
+
     OutlinedTextField(
         value = valor,
         onValueChange = aoAlterar,
+
         label = {
             Text(
                 text = label,
@@ -492,14 +598,26 @@ fun CampoTextoPenal(
                 fontSize = 12.sp
             )
         },
+
+        shape = RoundedCornerShape(14.dp),
+
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Gold,
-            unfocusedBorderColor = TextGray,
+            unfocusedBorderColor = BorderBlue,
+
             focusedTextColor = TextWhite,
             unfocusedTextColor = TextWhite,
+
+            focusedContainerColor = InputBlue,
+            unfocusedContainerColor = InputBlue,
+
             cursorColor = Gold
         ),
+
         singleLine = true,
+
         modifier = modifier
+            .fillMaxWidth()
+            .height(60.dp)
     )
 }

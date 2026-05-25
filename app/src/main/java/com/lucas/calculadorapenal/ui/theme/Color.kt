@@ -15,3 +15,6 @@ val TextGray = Color(0xFFB8C1D1)
 
 val SuccessGreen = Color(0xFF2ECC71)
 val WarningOrange = Color(0xFFF39C12)
+
+val InputBlue = Color(0xFF243B72)
+val BorderBlue = Color(0xFF3B4F80)
