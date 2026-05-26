@@ -24,6 +24,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lucas.calculadorapenal.ui.theme.*
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlin.math.ceil
+
+data class ResultadoCalculo(
+    val erro: String? = null,
+    val dataSemiaberto: String? = null,
+    val dataAberto: String? = null,
+    val dataLivramento: String? = null,
+    val dataTermino: String? = null,
+    val percentualProgressao: String = "",
+    val percentualAberto: String = "",
+    val percentualLivramento: String = "",
+    val avisoLivramento: String? = null
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +63,10 @@ fun TelaCalculadoraPenal() {
     var dias by remember { mutableStateOf("") }
 
     var dataInicio by remember { mutableStateOf("") }
+    var regimeInicial by remember { mutableStateOf("Fechado") }
     var tipoCrime by remember { mutableStateOf("Comum") }
+    var violenciaGraveAmeaca by remember { mutableStateOf("Não") }
+    var resultadoMorte by remember { mutableStateOf("Não") }
     var statusApenado by remember { mutableStateOf("Primário") }
 
     var diasTrabalhados by remember { mutableStateOf("") }
@@ -54,6 +74,7 @@ fun TelaCalculadoraPenal() {
 
     var resultadoVisivel by remember { mutableStateOf(false) }
     var carregando by remember { mutableStateOf(false) }
+    var resultadoCalculo by remember { mutableStateOf<ResultadoCalculo?>(null) }
 
     Column(
         modifier = Modifier
@@ -134,8 +155,19 @@ fun TelaCalculadoraPenal() {
         CardDadosJuridicos(
             dataInicio = dataInicio,
             onDataInicioChange = { dataInicio = it },
+
+            regimeInicial = regimeInicial,
+            onRegimeInicialChange = { regimeInicial = it },
+
             tipoCrime = tipoCrime,
             onTipoCrimeChange = { tipoCrime = it },
+
+            violenciaGraveAmeaca = violenciaGraveAmeaca,
+            onViolenciaChange = { violenciaGraveAmeaca = it },
+
+            resultadoMorte = resultadoMorte,
+            onResultadoMorteChange = { resultadoMorte = it },
+
             statusApenado = statusApenado,
             onStatusChange = { statusApenado = it }
         )
@@ -154,6 +186,21 @@ fun TelaCalculadoraPenal() {
         Button(
             onClick = {
                 carregando = true
+
+                resultadoCalculo = calcularResultados(
+                    anos = anos,
+                    meses = meses,
+                    dias = dias,
+                    dataInicio = dataInicio,
+                    regimeInicial = regimeInicial,
+                    tipoCrime = tipoCrime,
+                    violenciaGraveAmeaca = violenciaGraveAmeaca,
+                    resultadoMorte = resultadoMorte,
+                    statusApenado = statusApenado,
+                    diasTrabalhados = diasTrabalhados,
+                    horasEstudo = horasEstudo
+                )
+
                 resultadoVisivel = true
                 carregando = false
             },
@@ -162,9 +209,7 @@ fun TelaCalculadoraPenal() {
                 contentColor = TextWhite
             ),
             shape = RoundedCornerShape(18.dp),
-            elevation = ButtonDefaults.buttonElevation(
-                defaultElevation = 8.dp
-            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(58.dp)
@@ -184,9 +229,9 @@ fun TelaCalculadoraPenal() {
             }
         }
 
-        if (resultadoVisivel) {
+        if (resultadoVisivel && resultadoCalculo != null) {
             Spacer(modifier = Modifier.height(18.dp))
-            CardResultado()
+            CardResultado(resultado = resultadoCalculo!!)
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -195,32 +240,23 @@ fun TelaCalculadoraPenal() {
             onClick = {
                 val numero = "5511989498044"
                 val mensagem = "Olá, gostaria de tirar uma dúvida sobre execução penal."
-
-                val url =
-                    "https://api.whatsapp.com/send?phone=$numero&text=${Uri.encode(mensagem)}"
-
+                val url = "https://api.whatsapp.com/send?phone=$numero&text=${Uri.encode(mensagem)}"
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                 context.startActivity(intent)
             },
-
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFF25D366),
                 contentColor = TextWhite
             ),
-
             shape = RoundedCornerShape(18.dp),
-
             modifier = Modifier
                 .width(280.dp)
                 .height(52.dp)
-
         ) {
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-
                 Image(
                     painter = painterResource(id = R.drawable.whatsapp_logo),
                     contentDescription = "WhatsApp",
@@ -239,6 +275,144 @@ fun TelaCalculadoraPenal() {
 
         Spacer(modifier = Modifier.height(32.dp))
     }
+}
+
+fun calcularResultados(
+    anos: String,
+    meses: String,
+    dias: String,
+    dataInicio: String,
+    regimeInicial: String,
+    tipoCrime: String,
+    violenciaGraveAmeaca: String,
+    resultadoMorte: String,
+    statusApenado: String,
+    diasTrabalhados: String,
+    horasEstudo: String
+): ResultadoCalculo {
+    val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+
+    val anosInt = anos.toIntOrNull() ?: 0
+    val mesesInt = meses.toIntOrNull() ?: 0
+    val diasInt = dias.toIntOrNull() ?: 0
+
+    val totalDiasPena = (anosInt * 365) + (mesesInt * 30) + diasInt
+
+    if (totalDiasPena <= 0) {
+        return ResultadoCalculo(
+            erro = "Informe a duração da pena para realizar o cálculo."
+        )
+    }
+
+    if (dataInicio.length != 10) {
+        return ResultadoCalculo(
+            erro = "Selecione a data de início da pena."
+        )
+    }
+
+    val dataBase = try {
+        LocalDate.parse(dataInicio, formatter)
+    } catch (e: Exception) {
+        return ResultadoCalculo(
+            erro = "Data inválida. Selecione a data novamente."
+        )
+    }
+
+    val percentualProgressao = calcularPercentualProgressao(
+        tipoCrime = tipoCrime,
+        violenciaGraveAmeaca = violenciaGraveAmeaca,
+        resultadoMorte = resultadoMorte,
+        statusApenado = statusApenado
+    )
+
+    val percentualAberto = (percentualProgressao + 0.10).coerceAtMost(1.0)
+
+    val percentualLivramento = calcularPercentualLivramento(
+        tipoCrime = tipoCrime,
+        resultadoMorte = resultadoMorte,
+        statusApenado = statusApenado
+    )
+
+    val remicao = calcularRemicao(
+        diasTrabalhados = diasTrabalhados,
+        horasEstudo = horasEstudo
+    )
+
+    fun calcularData(percentual: Double): String {
+        val diasNecessarios = ceil(totalDiasPena * percentual).toLong()
+        val diasComRemicao = (diasNecessarios - remicao).coerceAtLeast(0)
+        return dataBase.plusDays(diasComRemicao).format(formatter)
+    }
+
+    val termino = dataBase
+        .plusDays((totalDiasPena.toLong() - remicao).coerceAtLeast(0))
+        .format(formatter)
+
+    val livramentoVedado = tipoCrime == "Hediondo" && resultadoMorte == "Sim"
+
+    return ResultadoCalculo(
+        dataSemiaberto = if (regimeInicial == "Fechado") calcularData(percentualProgressao) else null,
+        dataAberto = if (regimeInicial == "Fechado" || regimeInicial == "Semiaberto") calcularData(percentualAberto) else null,
+        dataLivramento = if (!livramentoVedado) calcularData(percentualLivramento) else null,
+        dataTermino = termino,
+        percentualProgressao = "${(percentualProgressao * 100).toInt()}%",
+        percentualAberto = "${(percentualAberto * 100).toInt()}%",
+        percentualLivramento = "${(percentualLivramento * 100).toInt()}%",
+        avisoLivramento = if (livramentoVedado) {
+            "Livramento condicional vedado para crime hediondo com resultado morte."
+        } else null
+    )
+}
+
+fun calcularPercentualProgressao(
+    tipoCrime: String,
+    violenciaGraveAmeaca: String,
+    resultadoMorte: String,
+    statusApenado: String
+): Double {
+    val reincidente = statusApenado == "Reincidente"
+    val violencia = violenciaGraveAmeaca == "Sim"
+    val morte = resultadoMorte == "Sim"
+
+    return when {
+        tipoCrime == "Hediondo" && morte && reincidente -> 0.85
+        tipoCrime == "Hediondo" && morte && !reincidente -> 0.75
+        tipoCrime == "Hediondo" && reincidente -> 0.80
+        tipoCrime == "Hediondo" && !reincidente -> 0.70
+
+        tipoCrime == "Comum" && violencia && reincidente -> 0.30
+        tipoCrime == "Comum" && violencia && !reincidente -> 0.25
+        tipoCrime == "Comum" && !violencia && reincidente -> 0.20
+        else -> 0.16
+    }
+}
+
+fun calcularPercentualLivramento(
+    tipoCrime: String,
+    resultadoMorte: String,
+    statusApenado: String
+): Double {
+    val reincidente = statusApenado == "Reincidente"
+
+    return when {
+        tipoCrime == "Hediondo" && resultadoMorte == "Sim" -> 1.0
+        tipoCrime == "Hediondo" -> 2.0 / 3.0
+        reincidente -> 0.50
+        else -> 1.0 / 3.0
+    }
+}
+
+fun calcularRemicao(
+    diasTrabalhados: String,
+    horasEstudo: String
+): Long {
+    val trabalho = diasTrabalhados.toLongOrNull() ?: 0L
+    val estudo = horasEstudo.toLongOrNull() ?: 0L
+
+    val remicaoTrabalho = trabalho / 3
+    val remicaoEstudo = estudo / 12
+
+    return remicaoTrabalho + remicaoEstudo
 }
 
 @Composable
@@ -290,8 +464,19 @@ fun CardEntradaPena(
 fun CardDadosJuridicos(
     dataInicio: String,
     onDataInicioChange: (String) -> Unit,
+
+    regimeInicial: String,
+    onRegimeInicialChange: (String) -> Unit,
+
     tipoCrime: String,
     onTipoCrimeChange: (String) -> Unit,
+
+    violenciaGraveAmeaca: String,
+    onViolenciaChange: (String) -> Unit,
+
+    resultadoMorte: String,
+    onResultadoMorteChange: (String) -> Unit,
+
     statusApenado: String,
     onStatusChange: (String) -> Unit
 ) {
@@ -303,26 +488,21 @@ fun CardDadosJuridicos(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        CampoTextoPenal(
+        CampoDataPenal(
             valor = dataInicio,
-            aoAlterar = {
-                val numeros = it
-                    .filter { char -> char.isDigit() }
-                    .take(8)
+            aoSelecionarData = onDataInicioChange,
+            label = "Selecionar data de início da pena"
+        )
 
-                val dataFormatada = buildString {
-                    for (i in numeros.indices) {
-                        append(numeros[i])
+        Spacer(modifier = Modifier.height(16.dp))
 
-                        if ((i == 1 || i == 3) && i != numeros.lastIndex) {
-                            append("/")
-                        }
-                    }
-                }
+        Text("Regime Inicial", color = TextGray, fontSize = 13.sp)
+        Spacer(modifier = Modifier.height(8.dp))
 
-                onDataInicioChange(dataFormatada)
-            },
-            label = "Data de início da pena"
+        LinhaOpcoes(
+            opcaoSelecionada = regimeInicial,
+            opcoes = listOf("Fechado", "Semiaberto", "Aberto"),
+            aoSelecionar = onRegimeInicialChange
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -334,6 +514,28 @@ fun CardDadosJuridicos(
             opcaoSelecionada = tipoCrime,
             opcoes = listOf("Comum", "Hediondo"),
             aoSelecionar = onTipoCrimeChange
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Violência ou grave ameaça?", color = TextGray, fontSize = 13.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LinhaOpcoes(
+            opcaoSelecionada = violenciaGraveAmeaca,
+            opcoes = listOf("Não", "Sim"),
+            aoSelecionar = onViolenciaChange
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Resultou em morte?", color = TextGray, fontSize = 13.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LinhaOpcoes(
+            opcaoSelecionada = resultadoMorte,
+            opcoes = listOf("Não", "Sim"),
+            aoSelecionar = onResultadoMorteChange
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -399,7 +601,7 @@ fun CardRemicaoPena(
 }
 
 @Composable
-fun CardResultado() {
+fun CardResultado(resultado: ResultadoCalculo) {
     CardBase {
         Text(
             text = "Progressões e Benefícios",
@@ -411,42 +613,81 @@ fun CardResultado() {
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = "Datas calculadas conforme a Lei nº 13.964/2019",
+            text = "Datas calculadas conforme parâmetros informados",
             color = TextGray,
             fontSize = 13.sp
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        ItemResultado(
-            titulo = "Progressão para Regime Semiaberto",
-            descricao = "Após cumprir a fração exigida da pena",
-            data = "25/12/2027",
-            porcentagem = "60%"
-        )
+        if (resultado.erro != null) {
+            Text(
+                text = resultado.erro,
+                color = Gold,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            return@CardBase
+        }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        resultado.dataSemiaberto?.let {
+            ItemResultado(
+                titulo = "Progressão para Regime Semiaberto",
+                descricao = "Após cumprir ${resultado.percentualProgressao} da pena, com eventual remição aplicada.",
+                data = it,
+                porcentagem = resultado.percentualProgressao
+            )
 
-        ItemResultado(
-            titulo = "Progressão para Regime Aberto",
-            descricao = "Após cumprir nova etapa da pena",
-            data = "02/03/2029",
-            porcentagem = "70%"
-        )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        resultado.dataAberto?.let {
+            ItemResultado(
+                titulo = "Progressão para Regime Aberto",
+                descricao = "Estimativa de nova etapa de progressão.",
+                data = it,
+                porcentagem = resultado.percentualAberto
+            )
 
-        ItemResultado(
-            titulo = "Livramento Condicional",
-            descricao = "Estimativa conforme requisitos legais",
-            data = "02/03/2029",
-            porcentagem = "70%"
-        )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        resultado.dataLivramento?.let {
+            ItemResultado(
+                titulo = "Livramento Condicional",
+                descricao = "Estimativa conforme os requisitos legais gerais.",
+                data = it,
+                porcentagem = resultado.percentualLivramento
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        resultado.avisoLivramento?.let {
+            Text(
+                text = it,
+                color = Gold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 18.sp
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        resultado.dataTermino?.let {
+            ItemResultado(
+                titulo = "Término da Pena",
+                descricao = "Data estimada para cumprimento integral da pena.",
+                data = it,
+                porcentagem = "100%"
+            )
+        }
 
         Spacer(modifier = Modifier.height(14.dp))
 
         Text(
-            text = "Importante: esta calculadora fornece apenas estimativas educativas. Consulte sempre um advogado especializado.",
+            text = "Importante: esta calculadora fornece apenas estimativas educativas. Os cálculos podem variar conforme decisões judiciais, faltas graves, detração, remição e análise do caso concreto.",
             color = TextGray,
             fontSize = 12.sp,
             lineHeight = 18.sp
@@ -462,15 +703,11 @@ fun ItemResultado(
     porcentagem: String
 ) {
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = DarkBlue
-        ),
+        colors = CardDefaults.cardColors(containerColor = DarkBlue),
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -484,17 +721,12 @@ fun ItemResultado(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "⏳",
-                        fontSize = 18.sp
-                    )
+                    Text(text = "⏳", fontSize = 18.sp)
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = titulo,
                         color = TextWhite,
@@ -518,22 +750,14 @@ fun ItemResultado(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .background(
-                            Gold,
-                            RoundedCornerShape(20.dp)
-                        )
-                        .padding(
-                            horizontal = 10.dp,
-                            vertical = 5.dp
-                        )
+                        .background(Gold, RoundedCornerShape(20.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            HorizontalDivider(
-                color = BorderBlue.copy(alpha = 0.5f)
-            )
+            HorizontalDivider(color = BorderBlue.copy(alpha = 0.5f))
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -608,7 +832,11 @@ fun LinhaOpcoes(
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                Text(opcao, fontSize = 12.sp)
+                Text(
+                    text = opcao,
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
             }
         }
     }
@@ -646,4 +874,76 @@ fun CampoTextoPenal(
             .fillMaxWidth()
             .height(60.dp)
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CampoDataPenal(
+    valor: String,
+    aoSelecionarData: (String) -> Unit,
+    label: String
+) {
+    var mostrarCalendario by remember { mutableStateOf(false) }
+
+    val datePickerState = rememberDatePickerState()
+
+    Button(
+        onClick = { mostrarCalendario = true },
+        colors = ButtonDefaults.buttonColors(
+            containerColor = InputBlue,
+            contentColor = TextWhite
+        ),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)
+    ) {
+        Text(
+            text = if (valor.isBlank()) label else valor,
+            color = if (valor.isBlank()) TextGray else TextWhite,
+            fontSize = 14.sp
+        )
+    }
+
+    if (mostrarCalendario) {
+        DatePickerDialog(
+            onDismissRequest = { mostrarCalendario = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val millis = datePickerState.selectedDateMillis
+
+                        if (millis != null) {
+                            val data = Instant
+                                .ofEpochMilli(millis)
+                                .atZone(ZoneId.of("UTC"))
+                                .toLocalDate()
+
+                            val dataFormatada =
+                                "%02d/%02d/%04d".format(
+                                    data.dayOfMonth,
+                                    data.monthValue,
+                                    data.year
+                                )
+
+                            aoSelecionarData(dataFormatada)
+                        }
+
+                        mostrarCalendario = false
+                    }
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { mostrarCalendario = false }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
