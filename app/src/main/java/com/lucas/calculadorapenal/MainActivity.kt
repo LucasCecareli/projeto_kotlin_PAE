@@ -69,6 +69,10 @@ fun TelaCalculadoraPenal() {
     var resultadoMorte by remember { mutableStateOf("Não") }
     var statusApenado by remember { mutableStateOf("Primário") }
 
+    var detracaoAnos by remember { mutableStateOf("") }
+    var detracaoMeses by remember { mutableStateOf("") }
+    var detracaoDias by remember { mutableStateOf("") }
+
     var diasTrabalhados by remember { mutableStateOf("") }
     var horasEstudo by remember { mutableStateOf("") }
 
@@ -174,6 +178,17 @@ fun TelaCalculadoraPenal() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        CardDetracaoPena(
+            anos = detracaoAnos,
+            meses = detracaoMeses,
+            dias = detracaoDias,
+            onAnosChange = { detracaoAnos = it },
+            onMesesChange = { detracaoMeses = it },
+            onDiasChange = { detracaoDias = it }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         CardRemicaoPena(
             diasTrabalhados = diasTrabalhados,
             onDiasTrabalhadosChange = { diasTrabalhados = it },
@@ -198,7 +213,10 @@ fun TelaCalculadoraPenal() {
                     resultadoMorte = resultadoMorte,
                     statusApenado = statusApenado,
                     diasTrabalhados = diasTrabalhados,
-                    horasEstudo = horasEstudo
+                    horasEstudo = horasEstudo,
+                    detracaoAnos = detracaoAnos,
+                    detracaoMeses = detracaoMeses,
+                    detracaoDias = detracaoDias
                 )
 
                 resultadoVisivel = true
@@ -288,7 +306,10 @@ fun calcularResultados(
     resultadoMorte: String,
     statusApenado: String,
     diasTrabalhados: String,
-    horasEstudo: String
+    horasEstudo: String,
+    detracaoAnos: String,
+    detracaoMeses: String,
+    detracaoDias: String
 ): ResultadoCalculo {
     val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
@@ -298,9 +319,20 @@ fun calcularResultados(
 
     val totalDiasPena = (anosInt * 365) + (mesesInt * 30) + diasInt
 
+    val detracaoTotalDias =
+        ((detracaoAnos.toIntOrNull() ?: 0) * 365) +
+                ((detracaoMeses.toIntOrNull() ?: 0) * 30) +
+                (detracaoDias.toIntOrNull() ?: 0)
+
     if (totalDiasPena <= 0) {
         return ResultadoCalculo(
             erro = "Informe a duração da pena para realizar o cálculo."
+        )
+    }
+
+    if (detracaoTotalDias > totalDiasPena) {
+        return ResultadoCalculo(
+            erro = "O tempo de detração não pode ser maior que a pena total."
         )
     }
 
@@ -340,12 +372,14 @@ fun calcularResultados(
 
     fun calcularData(percentual: Double): String {
         val diasNecessarios = ceil(totalDiasPena * percentual).toLong()
-        val diasComRemicao = (diasNecessarios - remicao).coerceAtLeast(0)
-        return dataBase.plusDays(diasComRemicao).format(formatter)
+        val diasComDescontos =
+            (diasNecessarios - remicao - detracaoTotalDias).coerceAtLeast(0)
+
+        return dataBase.plusDays(diasComDescontos).format(formatter)
     }
 
     val termino = dataBase
-        .plusDays((totalDiasPena.toLong() - remicao).coerceAtLeast(0))
+        .plusDays((totalDiasPena.toLong() - remicao - detracaoTotalDias).coerceAtLeast(0))
         .format(formatter)
 
     val livramentoVedado = tipoCrime == "Hediondo" && resultadoMorte == "Sim"
@@ -552,6 +586,51 @@ fun CardDadosJuridicos(
 }
 
 @Composable
+fun CardDetracaoPena(
+    anos: String,
+    meses: String,
+    dias: String,
+    onAnosChange: (String) -> Unit,
+    onMesesChange: (String) -> Unit,
+    onDiasChange: (String) -> Unit
+) {
+    CardBase {
+        TituloCard(
+            titulo = "Tempo de Detração",
+            subtitulo = "Tempo já cumprido ou abatido da pena"
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            CampoTextoPenal(
+                valor = anos,
+                aoAlterar = onAnosChange,
+                label = "Anos",
+                modifier = Modifier.weight(1f)
+            )
+
+            CampoTextoPenal(
+                valor = meses,
+                aoAlterar = onMesesChange,
+                label = "Meses",
+                modifier = Modifier.weight(1f)
+            )
+
+            CampoTextoPenal(
+                valor = dias,
+                aoAlterar = onDiasChange,
+                label = "Dias",
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
 fun CardRemicaoPena(
     diasTrabalhados: String,
     onDiasTrabalhadosChange: (String) -> Unit,
@@ -633,7 +712,7 @@ fun CardResultado(resultado: ResultadoCalculo) {
         resultado.dataSemiaberto?.let {
             ItemResultado(
                 titulo = "Progressão para Regime Semiaberto",
-                descricao = "Após cumprir ${resultado.percentualProgressao} da pena, com eventual remição aplicada.",
+                descricao = "Após cumprir ${resultado.percentualProgressao} da pena, com eventual remição e detração aplicadas.",
                 data = it,
                 porcentagem = resultado.percentualProgressao
             )
