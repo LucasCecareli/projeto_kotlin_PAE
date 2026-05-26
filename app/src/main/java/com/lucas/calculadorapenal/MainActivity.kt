@@ -1,8 +1,11 @@
 package com.lucas.calculadorapenal
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,15 +15,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lucas.calculadorapenal.ui.theme.*
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.Dp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,6 +39,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun TelaCalculadoraPenal() {
+    val context = LocalContext.current
+
     var anos by remember { mutableStateOf("") }
     var meses by remember { mutableStateOf("") }
     var dias by remember { mutableStateOf("") }
@@ -49,6 +54,7 @@ fun TelaCalculadoraPenal() {
 
     var resultadoVisivel by remember { mutableStateOf(false) }
     var carregando by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -147,41 +153,29 @@ fun TelaCalculadoraPenal() {
 
         Button(
             onClick = {
-
                 carregando = true
-
                 resultadoVisivel = true
-
                 carregando = false
             },
-
             colors = ButtonDefaults.buttonColors(
                 containerColor = Gold,
                 contentColor = TextWhite
             ),
-
             shape = RoundedCornerShape(18.dp),
-
             elevation = ButtonDefaults.buttonElevation(
                 defaultElevation = 8.dp
             ),
-
             modifier = Modifier
                 .fillMaxWidth()
                 .height(58.dp)
-
         ) {
-
             if (carregando) {
-
                 CircularProgressIndicator(
                     color = TextWhite,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(22.dp)
                 )
-
             } else {
-
                 Text(
                     text = "Calcular Progressões",
                     fontSize = 17.sp,
@@ -193,6 +187,54 @@ fun TelaCalculadoraPenal() {
         if (resultadoVisivel) {
             Spacer(modifier = Modifier.height(18.dp))
             CardResultado()
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Button(
+            onClick = {
+                val numero = "5511989498044"
+                val mensagem = "Olá, gostaria de tirar uma dúvida sobre execução penal."
+
+                val url =
+                    "https://api.whatsapp.com/send?phone=$numero&text=${Uri.encode(mensagem)}"
+
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                context.startActivity(intent)
+            },
+
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF25D366),
+                contentColor = TextWhite
+            ),
+
+            shape = RoundedCornerShape(18.dp),
+
+            modifier = Modifier
+                .width(280.dp)
+                .height(52.dp)
+
+        ) {
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+
+                Image(
+                    painter = painterResource(id = R.drawable.whatsapp_logo),
+                    contentDescription = "WhatsApp",
+                    modifier = Modifier.size(22.dp)
+                )
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Text(
+                    text = "Falar com Advogado",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -264,15 +306,12 @@ fun CardDadosJuridicos(
         CampoTextoPenal(
             valor = dataInicio,
             aoAlterar = {
-
                 val numeros = it
                     .filter { char -> char.isDigit() }
                     .take(8)
 
                 val dataFormatada = buildString {
-
                     for (i in numeros.indices) {
-
                         append(numeros[i])
 
                         if ((i == 1 || i == 3) && i != numeros.lastIndex) {
@@ -429,16 +468,13 @@ fun ItemResultado(
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -459,7 +495,6 @@ fun ItemResultado(
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
-
                     Text(
                         text = titulo,
                         color = TextWhite,
@@ -586,11 +621,9 @@ fun CampoTextoPenal(
     label: String,
     modifier: Modifier = Modifier
 ) {
-
     OutlinedTextField(
         value = valor,
         onValueChange = aoAlterar,
-
         label = {
             Text(
                 text = label,
@@ -598,24 +631,17 @@ fun CampoTextoPenal(
                 fontSize = 12.sp
             )
         },
-
         shape = RoundedCornerShape(14.dp),
-
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Gold,
             unfocusedBorderColor = BorderBlue,
-
             focusedTextColor = TextWhite,
             unfocusedTextColor = TextWhite,
-
             focusedContainerColor = InputBlue,
             unfocusedContainerColor = InputBlue,
-
             cursorColor = Gold
         ),
-
         singleLine = true,
-
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
